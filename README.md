@@ -74,8 +74,10 @@ python -m venv .venv
 .\.venv\Scripts\activate   # Windows
 # source .venv/bin/activate  # Linux / macOS
 
-# Install dependencies
-pip install -r requirements.txt
+# Install
+pip install .
+# Or, for development:
+# pip install -e .
 ```
 
 ---
@@ -83,7 +85,7 @@ pip install -r requirements.txt
 ## ▶️ Usage
 
 ```bash
-python bangen.py
+bangen
 ```
 
 Bangen will walk you through everything interactively — text, font, color, animation, and save options. No flags, no config. Just vibes.
@@ -110,7 +112,7 @@ Bangen will walk you through everything interactively — text, font, color, ani
 ```
 bangen/
 ├── 🐍 bangen.py          # Main application
-├── 📦 requirements.txt   # Dependencies
+├── 📦 pyproject.toml      # Packaging + dependencies
 ├── 📄 LICENSE            # MIT license
 ├── 🙈 .gitignore         # Python defaults
 ├── 💁‍♂️ README.md          # Project information

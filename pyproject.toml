@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bangen"
+version = "0.1.0"
+description = "Terminal ASCII banner generator with rich panels and optional animation."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "pro-grammer-SD" }]
+keywords = ["ascii", "banner", "terminal", "pyfiglet", "rich"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Utilities",
+]
+dependencies = [
+  "pyfiglet",
+  "rich",
+]
+
+[project.urls]
+Homepage = "https://github.com/pro-grammer-SD/bangen"
+Repository = "https://github.com/pro-grammer-SD/bangen"
+Issues = "https://github.com/pro-grammer-SD/bangen/issues"
+
+[project.scripts]
+bangen = "bangen:main"
+
+[tool.setuptools]
+py-modules = ["bangen"]
