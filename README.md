@@ -23,6 +23,18 @@
 
 ---
 
+## ▶️ Demonstration
+
+## 🎬 Demo
+
+<p align="center">
+  <a href="https://youtu.be/QaXEEHgKrUg">
+    <img src="https://img.youtube.com/vi/QaXEEHgKrUg/maxresdefault.jpg" alt="Demo video" width="720">
+  </a>
+</p>
+
+---
+
 ## 🎨 What is Bangen?
 
 **Bangen** is a colorful, animated terminal banner generator built on [`pyfiglet`](https://github.com/pwaller/pyfiglet) and [`rich`](https://github.com/Textualize/rich). Type a word, pick a font and a color, and watch your terminal come alive with big bold ASCII art — optionally animated, optionally saved.
@@ -102,6 +114,7 @@ bangen/
 ├── 📄 LICENSE            # MIT license
 ├── 🙈 .gitignore         # Python defaults
 ├── 💁‍♂️ README.md          # Project information
+├── 🌟 demo.mp4           # A demonstration of the app
 └── 📸 screenshot.png     # A screenshot of the app
 ```
 
