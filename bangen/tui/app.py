@@ -98,6 +98,7 @@ class TUIApp:
         return self._state
 
     def _run_unix(self) -> None:
+        import signal
         import termios
         import tty
 
@@ -107,8 +108,17 @@ class TUIApp:
         saved = termios_mod.tcgetattr(fd)
         try:
             tty_mod.setraw(fd)
+            attrs = termios_mod.tcgetattr(fd)
+            attrs[1] |= termios_mod.OPOST
+            termios_mod.tcsetattr(fd, termios_mod.TCSANOW, attrs)
+
+            def _on_resize(*_: Any) -> None:
+                self._console.size = self._console.size  # force refresh
+
+            signal.signal(signal.SIGWINCH, _on_resize)
             self._event_loop(lambda: self._unix_key(fd))
         finally:
+            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
             termios_mod.tcsetattr(fd, termios_mod.TCSADRAIN, saved)
 
     def _unix_key(self, fd: int) -> str | None:
@@ -132,16 +142,16 @@ class TUIApp:
         return ch
 
     def _run_windows(self) -> None:
-        import msvcrt
+        import msvcrt  # type: ignore[import-untyped]
 
         key_map = {b"H": "\x1b[A", b"P": "\x1b[B", b"K": "\x1b[D", b"M": "\x1b[C"}
 
         def read() -> str | None:
-            if not msvcrt.kbhit():
+            if not msvcrt.kbhit():  # type: ignore[attr-defined]
                 return None
-            ch = msvcrt.getch()
+            ch = msvcrt.getch()  # type: ignore[attr-defined]
             if ch in (b"\x00", b"\xe0"):
-                return key_map.get(msvcrt.getch(), "")
+                return key_map.get(msvcrt.getch(), "")  # type: ignore[attr-defined]
             try:
                 return ch.decode("utf-8")
             except Exception:

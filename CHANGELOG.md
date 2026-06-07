@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.0]
+
+### Fixed
+- CLI no longer errors with "no command called X" when passing text directly as a positional argument (e.g., `bangen "hello"`). The entry point now automatically routes bare text arguments to the `main` subcommand.
+- TUI rendering on Linux/macOS no longer produces shattered/jagged output. The `tty.setraw()` call was clearing the terminal's `OPOST` flag, which disabled `\n` → `\r\n` translation and broke Rich's layout rendering. Output processing is now restored immediately after entering raw mode. SIGWINCH is also handled to refresh the console on terminal resize.
+
 ## [2.2.3]
 
 ### Added

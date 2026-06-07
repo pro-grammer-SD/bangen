@@ -56,7 +56,7 @@ class PresetDialog:
     def sync(self) -> None:
         self._refresh_presets(initial=False)
 
-    def render(self):
+    def render(self) -> RenderableType:
         self.sync()
 
         body = Table.grid(padding=(0, 1), expand=False)

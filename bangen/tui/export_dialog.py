@@ -6,6 +6,7 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from threading import Thread
+from typing import Any
 
 from rich import box
 from rich.align import Align
@@ -21,7 +22,7 @@ _FORMATS = ("gif", "png", "txt")
 
 
 class ExportDialog:
-    def __init__(self, banner, engine):
+    def __init__(self, banner: Any, engine: Any) -> None:
         self.banner = deepcopy(banner)
         self.engine = engine
         self.exporter = Exporter()
@@ -49,7 +50,7 @@ class ExportDialog:
         self._worker_error: str | None = None
         self._worker_result: str | None = None
 
-    def render(self):
+    def render(self) -> RenderableType:
         self.sync()
 
         body = Table.grid(padding=(0, 1), expand=False)
