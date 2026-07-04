@@ -58,6 +58,8 @@ bangen "SYSTEM READY" --font slant --gradient "#7c3aed:#06b6d4" --effect glow --
 
 ## Setup 🛠️
 
+1. Manual pip install:
+
 ```bash
 git clone https://github.com/programmersd21/bangen.git
 cd bangen
@@ -66,7 +68,15 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-🎯 Or download the prebuilts:
+2. AUR install:
+
+```bash
+yay -S bangen-bin
+```
+
+Thanks to [@Dominiquini](https://github.com/Dominiquini) for assistance in AUR deployment.
+
+3. Prebuilt install:
 
 https://github.com/programmersd21/bangen/releases/latest
 
