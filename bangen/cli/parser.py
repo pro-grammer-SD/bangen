@@ -21,14 +21,14 @@ app = typer.Typer(
         '  bangen "HELLO" --font slant --gradient "#ff00ff:#00ffff"\n'
         '  bangen "HELLO" --effect wave --effect chromatic_aberration --effect pulse --speed 1.5\n'
         '  bangen "HELLO" --screensaver\n'
-        '  bangen --preset neon_wave "HELLO"\n'
-        '  bangen --preset-file ./preset.json "HELLO"\n'
+        '  bangen "HELLO" --preset neon_wave\n'
+        '  bangen "HELLO" --preset-file ./preset.json\n'
         '  bangen "HELLO" --ai "cyberpunk neon hacker vibe"\n'
         '  bangen "HELLO" --export-png banner.png\n'
         '  bangen "HELLO" --export-gif banner.gif\n'
-        "  bangen --list-effects\n"
-        "  bangen --list-presets\n"
-        "  bangen --list-fonts"
+        "  bangen main --list-effects\n"
+        "  bangen main --list-presets\n"
+        "  bangen main --list-fonts"
     ),
 )
 
