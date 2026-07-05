@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   tag:
@@ -53,6 +53,7 @@ jobs:
 
   build:
     needs: tag
+    if: needs.tag.outputs.exists == 'false'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -85,15 +86,6 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: |
           printf 'from bangen.app import main\nif __name__=="__main__": main()\n' > _entry.py
-          
-          # 1. Bootstrap Python packages needed for the build environment
-          if [[ "$PLATFORM" == "linux" ]]; then
-            # Inside the container we use py3.11 to guarantee wheel availability
-            DOCKER_CMD="py3.11 -m pip install -U pip wheel pyinstaller packaging --no-cache-dir && py3.11 -m pip install . --no-cache-dir"
-          else
-            python -m pip install -U pip wheel pyinstaller packaging
-            pip install .
-          fi
 
           # 2. Extract dependencies dynamically using standardized PEP 508 parsing
           GENERATE_FLAGS_SCRIPT=$(cat <<'PYTHON_SCRIPT'
@@ -116,7 +108,10 @@ jobs:
 
           # 3. Compile executable
           if [[ "$PLATFORM" == "linux" ]]; then
-            # Run inside modern manylinux container with Python 3.11 to avoid native compilation errors
+            # Run inside modern manylinux container with Python 3.11 to avoid native compilation errors.
+            # NOTE: "py3.11" is only a shell alias defined via /root/.bashrc on this image, which is
+            # never sourced by a non-interactive `bash -c` shell (and isn't sourced at all once HOME
+            # is overridden to /tmp for the unprivileged -u user). Use the real interpreter path instead.
             docker run --rm \
               -u $(id -u):$(id -g) \
               -e HOME=/tmp \
@@ -125,12 +120,16 @@ jobs:
               ghcr.io/yt-dlp/manylinux2014_x86_64-shared \
               bash -c "
                 set -euo pipefail
-                $DOCKER_CMD
-                COLLECT_FLAGS=\$(py3.11 -c '$GENERATE_FLAGS_SCRIPT')
-                py3.11 -m PyInstaller --onefile --noconfirm --strip --noupx --name bangen --distpath dist --workpath build \$COLLECT_FLAGS --optimize 2 _entry.py
+                PY=/opt/python/cp311-cp311/bin/python3.11
+                \$PY -m pip install -U pip wheel pyinstaller packaging --no-cache-dir
+                \$PY -m pip install . --no-cache-dir
+                COLLECT_FLAGS=\$(\$PY -c '$GENERATE_FLAGS_SCRIPT')
+                \$PY -m PyInstaller --onefile --noconfirm --strip --noupx --name bangen --distpath dist --workpath build \$COLLECT_FLAGS --optimize 2 _entry.py
                 strings dist/bangen | grep GLIBC_ | sort -V | uniq
               "
           else
+            python -m pip install -U pip wheel pyinstaller packaging
+            pip install .
             COLLECT_FLAGS=$(python -c "$GENERATE_FLAGS_SCRIPT")
             python -m PyInstaller --onefile --noconfirm --noupx --name bangen --distpath dist --workpath build $COLLECT_FLAGS --optimize 2 _entry.py
           fi
@@ -141,7 +140,7 @@ jobs:
         run: |
           mkdir -p release
           NAME="bangen-${{ matrix.platform }}-${{ needs.tag.outputs.version }}"
-          
+
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             mv dist/${{ matrix.bin }} release/$NAME.exe
             powershell -Command "Compress-Archive -Path release\\$NAME.exe -DestinationPath release\\$NAME.zip"
