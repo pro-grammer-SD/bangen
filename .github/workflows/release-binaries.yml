@@ -113,13 +113,18 @@ jobs:
             # never sourced by a non-interactive `bash -c` shell (and isn't sourced at all once HOME
             # is overridden to /tmp for the unprivileged -u user). Use the real interpreter path instead.
             docker run --rm \
-              -u $(id -u):$(id -g) \
-              -e HOME=/tmp \
+              -e HOME=/root \
               -v "${{ github.workspace }}:/workspace" \
               -w /workspace \
               ghcr.io/yt-dlp/manylinux2014_x86_64-shared \
               bash -c "
                 set -euo pipefail
+                # Pillow >= 11 only ships manylinux_2_27/2_28 wheels for cp311, which this
+                # manylinux2014 (CentOS7/glibc2.17) image can't use, so pip falls back to
+                # building the latest Pillow from source. That needs libjpeg's headers,
+                # which this image doesn't ship by default. Install them via yum (root is
+                # required for this, hence no -u/-e HOME=/tmp on this docker run).
+                yum install -y libjpeg-turbo-devel zlib-devel >/dev/null
                 PY=/opt/python/cp311-cp311/bin/python3.11
                 \$PY -m pip install -U pip wheel pyinstaller packaging --no-cache-dir
                 \$PY -m pip install . --no-cache-dir
