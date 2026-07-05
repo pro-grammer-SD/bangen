@@ -29,6 +29,7 @@ ENV/
 env/
 *.env
 .env
+poetry.lock
 
 banner.gif
 banner.png
