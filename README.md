@@ -180,17 +180,17 @@ bangen "HELLO" --gradient "#ff0000:#ffff00:#00ff00" --gradient-dir vertical
 #### Discoverability
 
 ```bash
-bangen --list-effects
-bangen --list-fonts
-bangen --list-presets
+bangen main --list-effects
+bangen main --list-fonts
+bangen main --list-presets
 ```
 
 #### Presets and AI
 
 ```bash
-bangen --preset cyberpunk "HELLO"
-bangen --preset matrix "SYSTEM"
-bangen --preset-file ./my_preset.json "HELLO"
+bangen "HELLO" --preset cyberpunk
+bangen "SYSTEM" --preset matrix
+bangen "HELLO" --preset-file ./my_preset.json
 bangen "HELLO" --ai "retro CRT hacker title"
 ```
 
