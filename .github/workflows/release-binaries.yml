@@ -72,11 +72,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Windows & macOS native Python setup (Pinned to 3.11 for parity)
+      # Windows & macOS native Python setup (3.13, to match the only PyInstaller-usable
+      # interpreter available in the Linux manylinux2014-shared image below)
       - if: matrix.platform != 'linux'
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Cache pip's download cache + yum's package cache for the Linux container build,
+      # since those aren't covered by setup-python (which only runs for windows/macos above).
+      - if: matrix.platform == 'linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/pip
+            .cache/yum
+          key: linux-build-cache-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            linux-build-cache-
 
       # Core Build step handling logic per platform
       - name: Build Executable
@@ -108,26 +123,32 @@ jobs:
 
           # 3. Compile executable
           if [[ "$PLATFORM" == "linux" ]]; then
-            # Run inside modern manylinux container with Python 3.11 to avoid native compilation errors.
-            # NOTE: "py3.11" is only a shell alias defined via /root/.bashrc on this image, which is
-            # never sourced by a non-interactive `bash -c` shell (and isn't sourced at all once HOME
-            # is overridden to /tmp for the unprivileged -u user). Use the real interpreter path instead.
+            # This is a fork of the standard manylinux image, customized by yt-dlp specifically
+            # for building PyInstaller executables (see github.com/yt-dlp/manylinux-shared).
+            # The normal /opt/python/<tag> interpreters in this image (e.g. cp311-cp311) are
+            # static builds meant only for compiling wheels -- PyInstaller can't use them
+            # ("Python was built without a shared library"). The image only ships a
+            # PyInstaller-usable *shared* build for 3.13 and 3.14, at /opt/shared-cpython-3.13
+            # and /opt/shared-cpython-3.14. We use 3.13 here to match Windows/macOS above.
+            mkdir -p .cache/pip .cache/yum
             docker run --rm \
               -e HOME=/root \
               -v "${{ github.workspace }}:/workspace" \
+              -v "${{ github.workspace }}/.cache/pip:/root/.cache/pip" \
+              -v "${{ github.workspace }}/.cache/yum:/var/cache/yum" \
               -w /workspace \
               ghcr.io/yt-dlp/manylinux2014_x86_64-shared \
               bash -c "
                 set -euo pipefail
-                # Pillow >= 11 only ships manylinux_2_27/2_28 wheels for cp311, which this
+                # Pillow only ships manylinux_2_27/2_28 wheels these days, which this
                 # manylinux2014 (CentOS7/glibc2.17) image can't use, so pip falls back to
-                # building the latest Pillow from source. That needs libjpeg's headers,
-                # which this image doesn't ship by default. Install them via yum (root is
-                # required for this, hence no -u/-e HOME=/tmp on this docker run).
+                # building it from source. That needs libjpeg's headers, which this image
+                # doesn't ship by default. Install them via yum (root required, hence no
+                # -u/-e HOME=/tmp on this docker run). Cached across runs via /var/cache/yum.
                 yum install -y libjpeg-turbo-devel zlib-devel >/dev/null
-                PY=/opt/python/cp311-cp311/bin/python3.11
-                \$PY -m pip install -U pip wheel pyinstaller packaging --no-cache-dir
-                \$PY -m pip install . --no-cache-dir
+                PY=/opt/shared-cpython-3.13/bin/python3.13
+                \$PY -m pip install -U pip wheel pyinstaller packaging
+                \$PY -m pip install .
                 COLLECT_FLAGS=\$(\$PY -c '$GENERATE_FLAGS_SCRIPT')
                 \$PY -m PyInstaller --onefile --noconfirm --strip --noupx --name bangen --distpath dist --workpath build \$COLLECT_FLAGS --optimize 2 _entry.py
                 strings dist/bangen | grep GLIBC_ | sort -V | uniq
