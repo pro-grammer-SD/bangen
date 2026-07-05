@@ -26,9 +26,9 @@ app = typer.Typer(
         '  bangen "HELLO" --ai "cyberpunk neon hacker vibe"\n'
         '  bangen "HELLO" --export-png banner.png\n'
         '  bangen "HELLO" --export-gif banner.gif\n'
-        "  bangen main --list-effects\n"
-        "  bangen main --list-presets\n"
-        "  bangen main --list-fonts"
+        "  bangen --list-effects\n"
+        "  bangen --list-presets\n"
+        "  bangen --list-fonts"
     ),
 )
 
