@@ -115,10 +115,12 @@ class TUIApp:
             def _on_resize(*_: Any) -> None:
                 self._console.size = self._console.size  # force refresh
 
-            signal.signal(signal.SIGWINCH, _on_resize)
+            if hasattr(signal, "SIGWINCH"):
+                signal.signal(signal.SIGWINCH, _on_resize)
             self._event_loop(lambda: self._unix_key(fd))
         finally:
-            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+            if hasattr(signal, "SIGWINCH"):
+                signal.signal(signal.SIGWINCH, signal.SIG_DFL)
             termios_mod.tcsetattr(fd, termios_mod.TCSADRAIN, saved)
 
     def _unix_key(self, fd: int) -> str | None:

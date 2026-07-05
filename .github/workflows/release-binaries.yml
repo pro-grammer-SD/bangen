@@ -1,4 +1,4 @@
-name: Build & Release Bangen
+name: "Build & Release Bangen"
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
         run: |
           VERSION=$(python3 - <<'EOF'
           import tomllib
-          with open("pyproject.toml","rb") as f:
+          with open("pyproject.toml", "rb") as f:
               print(tomllib.load(f)["project"]["version"])
           EOF
           )
@@ -51,175 +51,115 @@ jobs:
           git tag "${{ steps.extract.outputs.tag }}"
           git push origin "${{ steps.extract.outputs.tag }}"
 
-  build-linux:
-    needs: tag
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Linux (manylinux2014)
-        shell: bash
-        env:
-          VERSION: ${{ needs.tag.outputs.version }}
-        run: |
-          printf 'from bangen.app import main\nif __name__=="__main__": main()\n' > _entry.py
-
-          # Extract dependencies from pyproject.toml and generate --collect-all flags
-          COLLECT_ALL_FLAGS=$(python3 - <<'PYTHON_SCRIPT'
-          import tomllib
-          
-          # Package name to module name mapping
-          pkg_to_module = {
-              "Pillow": "PIL",
-              "pyfiglet": "pyfiglet",
-              "pyperclip": "pyperclip",
-              "rich": "rich",
-              "typer": "typer",
-          }
-          
-          with open("pyproject.toml", "rb") as f:
-              config = tomllib.load(f)
-              deps = config["project"]["dependencies"]
-          
-          # Extract package names and convert to module names
-          modules = ["bangen"]  # Always include bangen
-          for dep in deps:
-              # Handle dependencies like "pyfiglet>=1.0" -> extract "pyfiglet"
-              pkg_name = dep.split(">=")[0].split("==")[0].split("<=")[0].split("<")[0].split(">")[0]
-              module_name = pkg_to_module.get(pkg_name, pkg_name)
-              modules.append(module_name)
-          
-          # Generate --collect-all flags
-          flags = " ".join([f"--collect-all {m}" for m in modules])
-          print(flags)
-          PYTHON_SCRIPT
-          )
-
-          docker run --rm \
-            -u $(id -u):$(id -g) \
-            -e HOME=/tmp \
-            -e PIP_NO_CACHE_DIR=1 \
-            -v "${{ github.workspace }}:/workspace" \
-            -w /workspace \
-            ghcr.io/yt-dlp/manylinux2014_x86_64-shared \
-            bash -c "
-              set -euo pipefail
-              py3.13 -m pip install -U pip wheel pyinstaller --no-cache-dir
-              py3.13 -m pip install \".[all]\" --no-cache-dir
-
-              py3.13 -m PyInstaller --onefile --noconfirm --strip --noupx \
-                --name bangen \
-                --distpath dist \
-                --workpath build \
-                $COLLECT_ALL_FLAGS \
-                --optimize 2 \
-                _entry.py
-
-              strings dist/bangen | grep GLIBC_ | sort -V | uniq
-            "
-          
-
-      - run: |
-          mkdir -p release
-          NAME="bangen-linux-${{ needs.tag.outputs.version }}"
-          mv dist/bangen release/$NAME
-          cd release && tar -czf "$NAME.tar.gz" "$NAME" && rm "$NAME"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
-          path: release/*
-          retention-days: 1
-
-  build-windows-macos:
+  build:
     needs: tag
     runs-on: ${{ matrix.os }}
-
     strategy:
+      fail-fast: false
       matrix:
         include:
+          - os: ubuntu-latest
+            platform: linux
+            bin: bangen
           - os: windows-latest
-            name: windows
+            platform: windows
             bin: bangen.exe
           - os: macos-latest
-            name: macos
+            platform: macos
             bin: bangen
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # Windows & macOS native Python setup (Pinned to 3.11 for parity)
+      - if: matrix.platform != 'linux'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      # Core Build step handling logic per platform
+      - name: Build Executable
         shell: bash
-        run: |
-          python -m pip install -U pip wheel pyinstaller
-          pip install ".[all]"
-
-      - name: Build
-        shell: bash
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           printf 'from bangen.app import main\nif __name__=="__main__": main()\n' > _entry.py
           
-          # Extract dependencies from pyproject.toml and generate --collect-all flags
-          COLLECT_ALL_FLAGS=$(python3 - <<'PYTHON_SCRIPT'
+          # 1. Bootstrap Python packages needed for the build environment
+          if [[ "$PLATFORM" == "linux" ]]; then
+            # Inside the container we use py3.11 to guarantee wheel availability
+            DOCKER_CMD="py3.11 -m pip install -U pip wheel pyinstaller packaging --no-cache-dir && py3.11 -m pip install . --no-cache-dir"
+          else
+            python -m pip install -U pip wheel pyinstaller packaging
+            pip install .
+          fi
+
+          # 2. Extract dependencies dynamically using standardized PEP 508 parsing
+          GENERATE_FLAGS_SCRIPT=$(cat <<'PYTHON_SCRIPT'
           import tomllib
-          
-          # Package name to module name mapping
-          pkg_to_module = {
-              "Pillow": "PIL",
-              "pyfiglet": "pyfiglet",
-              "pyperclip": "pyperclip",
-              "rich": "rich",
-              "typer": "typer",
-          }
-          
+          from packaging.requirements import Requirement
+
+          pkg_to_module = {"Pillow": "PIL"}
+          modules = ["bangen"]
+
           with open("pyproject.toml", "rb") as f:
-              config = tomllib.load(f)
-              deps = config["project"]["dependencies"]
-          
-          # Extract package names and convert to module names
-          modules = ["bangen"]  # Always include bangen
+              deps = tomllib.load(f).get("project", {}).get("dependencies", [])
+
           for dep in deps:
-              # Handle dependencies like "pyfiglet>=1.0" -> extract "pyfiglet"
-              pkg_name = dep.split(">=")[0].split("==")[0].split("<=")[0].split("<")[0].split(">")[0]
-              module_name = pkg_to_module.get(pkg_name, pkg_name)
-              modules.append(module_name)
-          
-          # Generate --collect-all flags
-          flags = " ".join([f"--collect-all {m}" for m in modules])
-          print(flags)
+              name = Requirement(dep).name
+              modules.append(pkg_to_module.get(name, name))
+
+          print(" ".join(f"--collect-all {m}" for m in sorted(set(modules))))
           PYTHON_SCRIPT
           )
-          
-          python -m PyInstaller --onefile --noconfirm --noupx --name bangen --distpath dist --workpath build $COLLECT_ALL_FLAGS --optimize 2 _entry.py
 
-      - name: Package
+          # 3. Compile executable
+          if [[ "$PLATFORM" == "linux" ]]; then
+            # Run inside modern manylinux container with Python 3.11 to avoid native compilation errors
+            docker run --rm \
+              -u $(id -u):$(id -g) \
+              -e HOME=/tmp \
+              -v "${{ github.workspace }}:/workspace" \
+              -w /workspace \
+              ghcr.io/yt-dlp/manylinux2014_x86_64-shared \
+              bash -c "
+                set -euo pipefail
+                $DOCKER_CMD
+                COLLECT_FLAGS=\$(py3.11 -c '$GENERATE_FLAGS_SCRIPT')
+                py3.11 -m PyInstaller --onefile --noconfirm --strip --noupx --name bangen --distpath dist --workpath build \$COLLECT_FLAGS --optimize 2 _entry.py
+                strings dist/bangen | grep GLIBC_ | sort -V | uniq
+              "
+          else
+            COLLECT_FLAGS=$(python -c "$GENERATE_FLAGS_SCRIPT")
+            python -m PyInstaller --onefile --noconfirm --noupx --name bangen --distpath dist --workpath build $COLLECT_FLAGS --optimize 2 _entry.py
+          fi
+
+      # 4. Standardized artifact compression and packaging
+      - name: Package Output
         shell: bash
         run: |
           mkdir -p release
-          NAME="bangen-${{ matrix.name }}-${{ needs.tag.outputs.version }}"
-
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
+          NAME="bangen-${{ matrix.platform }}-${{ needs.tag.outputs.version }}"
+          
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
             mv dist/${{ matrix.bin }} release/$NAME.exe
             powershell -Command "Compress-Archive -Path release\\$NAME.exe -DestinationPath release\\$NAME.zip"
             rm release/$NAME.exe
           else
             mv dist/${{ matrix.bin }} release/$NAME
-            cd release && tar -czf "$NAME.tar.gz" "$NAME" && rm "$NAME"
+            tar -czf "release/$NAME.tar.gz" -C release "$NAME"
+            rm release/$NAME
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}-build
+          name: ${{ matrix.platform }}-build
           path: release/*
           retention-days: 1
 
   release:
-    needs: [tag, build-linux, build-windows-macos]
+    needs: [tag, build]
     if: needs.tag.outputs.exists == 'false'
     runs-on: ubuntu-latest
     permissions:
@@ -231,7 +171,8 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - run: |
+      - name: Checksums
+        run: |
           cd artifacts
           sha256sum * > SHA256SUMS.txt
 
@@ -240,3 +181,4 @@ jobs:
           tag_name: ${{ needs.tag.outputs.tag }}
           name: "Bangen ${{ needs.tag.outputs.version }}"
           files: artifacts/*
+          
