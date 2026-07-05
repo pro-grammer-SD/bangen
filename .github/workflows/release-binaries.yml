@@ -133,6 +133,8 @@ jobs:
             mkdir -p .cache/pip .cache/yum
             docker run --rm \
               -e HOME=/root \
+              -e HOST_UID=$(id -u) \
+              -e HOST_GID=$(id -g) \
               -v "${{ github.workspace }}:/workspace" \
               -v "${{ github.workspace }}/.cache/pip:/root/.cache/pip" \
               -v "${{ github.workspace }}/.cache/yum:/var/cache/yum" \
@@ -152,6 +154,10 @@ jobs:
                 COLLECT_FLAGS=\$(\$PY -c '$GENERATE_FLAGS_SCRIPT')
                 \$PY -m PyInstaller --onefile --noconfirm --strip --noupx --name bangen --distpath dist --workpath build \$COLLECT_FLAGS --optimize 2 _entry.py
                 strings dist/bangen | grep GLIBC_ | sort -V | uniq
+                # Container ran as root, so dist/ and build/ are root-owned in the mounted
+                # workspace. Hand them back to the runner's user or the next step (running
+                # as that user) can't mv/rm them.
+                chown -R \$HOST_UID:\$HOST_GID /workspace/dist /workspace/build /workspace/.cache
               "
           else
             python -m pip install -U pip wheel pyinstaller packaging
